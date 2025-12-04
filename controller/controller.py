@@ -4,6 +4,7 @@ controller = Blueprint('controller', __name__, static_folder='static', template_
 app = controller
 app.secret_key = 'SOFTWARE'
 
+
 @app.route('/')
 def root_page():
     return render_template('index.html')
