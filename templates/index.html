@@ -123,7 +123,6 @@
         }
         .success {
             color: #28a745;
-            margin-top: 5px;
         }
         .modal-overlay {
             position: fixed;
@@ -235,7 +234,7 @@
             </div>
             <div class="filter-buttons">
                 <button :class="{active: filterBookmarked}" @click="toggleBookmarkFilter">[[ filterBookmarked ? '显示全部' : '仅显示书签' ]]</button>
-                <button class="success" @click="exportContacts">导出Excel</button>
+                <button class="success" style="color: #FFFFFF;" @click="exportContacts">导出Excel</button>
                 <button class="warning" @click="showImportModal = true">导入Excel</button>
             </div>
 
@@ -310,7 +309,7 @@
             <!-- 添加/编辑联系人表单 -->
             <div class="card">
                 <h4>[[ editingContact ? '编辑联系人' : '添加新联系人' ]]</h4>
-                <form @submit.prevent="editingContact ? updateContact() : addContact()">
+                <form style="margin-top: 10px;" @submit.prevent="editingContact ? updateContact() : addContact()">
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                         <div class="form-group">
                             <label>姓名：</label>
