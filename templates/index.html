@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>联系人管理系统</title>
+    <script src="/static/js/vue.js"></script>
+    <script src="/static/js/index.js"></script>
+    <link rel="stylesheet" href="/static/css/index.css">
+    <script src="/static/js/axios.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: "Microsoft YaHei", Arial, sans-serif;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        textarea {
+            resize: vertical;
+            min-height: 60px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button.danger {
+            background-color: #dc3545;
+        }
+        button.danger:hover {
+            background-color: #c82333;
+        }
+        button.success {
+            background-color: #28a745;
+        }
+        button.success:hover {
+            background-color: #218838;
+        }
+        button.warning {
+            background-color: #ffc107;
+            color: #000;
+        }
+        button.warning:hover {
+            background-color: #e0a800;
+        }
+        .card {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 15px;
+            position: relative;
+        }
+        .card.bookmarked {
+            border-color: #ffc107;
+            background-color: #fffbf0;
+        }
+        .bookmark-icon {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 20px;
+            cursor: pointer;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #ddd;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            margin-bottom: -1px;
+        }
+        .tab.active {
+            border-color: #ddd #ddd #fff;
+            border-radius: 4px 4px 0 0;
+            background: white;
+        }
+        .contact-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .error {
+            color: #dc3545;
+            margin-top: 5px;
+        }
+        .success {
+            color: #28a745;
+            margin-top: 5px;
+        }
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            width: 500px;
+            max-width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .search-bar {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        .search-bar input {
+            flex: 1;
+        }
+        .filter-buttons {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .contact-info {
+            margin: 5px 0;
+        }
+        .contact-info strong {
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+<div id="app">
+    <div class="container">
+        <!-- 登录/注册部分 -->
+        <div v-if="!currentUser">
+            <div class="tabs">
+                <div class="tab" :class="{active: activeTab === 'login'}" @click="activeTab = 'login'">登录</div>
+                <div class="tab" :class="{active: activeTab === 'register'}" @click="activeTab = 'register'">注册</div>
+            </div>
+
+            <!-- 登录表单 -->
+            <div v-if="activeTab === 'login'">
+                <form @submit.prevent="login">
+                    <div class="form-group">
+                        <label>用户名：</label>
+                        <input type="text" v-model="loginForm.username" required>
+                    </div>
+                    <div class="form-group">
+                        <label>密码：</label>
+                        <input type="password" v-model="loginForm.password" required>
+                    </div>
+                    <button type="submit" style="width: 100%">登录</button>
+                    <div v-if="message" :class="messageType">[[ message ]]</div>
+                </form>
+            </div>
+
+            <!-- 注册表单 -->
+            <div v-if="activeTab === 'register'">
+                <form @submit.prevent="register">
+                    <div class="form-group">
+                        <label>用户名：</label>
+                        <input type="text" v-model="registerForm.username" required>
+                    </div>
+                    <div class="form-group">
+                        <label>密码：</label>
+                        <input type="password" v-model="registerForm.password" required>
+                    </div>
+                    <div class="form-group">
+                        <label>昵称：</label>
+                        <input type="text" v-model="registerForm.nickname" required>
+                    </div>
+                    <div class="form-group">
+                        <label>真实姓名：</label>
+                        <input type="text" v-model="registerForm.realname" required>
+                    </div>
+                    <button type="submit" style="width: 100%">注册</button>
+                    <div v-if="message" :class="messageType">[[ message ]]</div>
+                </form>
+            </div>
+        </div>
+
+        <!-- 主应用界面 -->
+        <div v-else>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap;">
+                <h2>欢迎，[[ currentUser.nickname ]]！</h2>
+                <div>
+                    <button @click="showProfileModal = true">个人资料</button>
+                    <button @click="logout">退出登录</button>
+                </div>
+            </div>
+
+            <!-- 搜索和筛选 -->
+            <div class="search-bar">
+                <input type="text" v-model="searchQuery" @input="loadContacts" placeholder="搜索联系人（姓名、电话、邮箱）">
+            </div>
+            <div class="filter-buttons">
+                <button :class="{active: filterBookmarked}" @click="toggleBookmarkFilter">[[ filterBookmarked ? '显示全部' : '仅显示书签' ]]</button>
+                <button class="success" @click="exportContacts">导出Excel</button>
+                <button class="warning" @click="showImportModal = true">导入Excel</button>
+            </div>
+
+            <!-- 个人资料模态框 -->
+            <div v-if="showProfileModal" class="modal-overlay">
+                <div class="modal-content">
+                    <h3>更新个人资料</h3>
+                    <form @submit.prevent="updateProfile">
+                        <div class="form-group">
+                            <label>昵称：</label>
+                            <input type="text" v-model="profileForm.nickname" required>
+                        </div>
+                        <div class="form-group">
+                            <label>真实姓名：</label>
+                            <input type="text" v-model="profileForm.realname" required>
+                        </div>
+                        <div class="form-group">
+                            <label>新密码（留空保持当前密码）：</label>
+                            <input type="password" v-model="profileForm.password">
+                        </div>
+                        <button type="submit">更新</button>
+                        <button type="button" @click="showProfileModal = false">取消</button>
+                        <div v-if="message" :class="messageType">[[ message ]]</div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- 导入Excel模态框 -->
+            <div v-if="showImportModal" class="modal-overlay">
+                <div class="modal-content">
+                    <h3>导入联系人</h3>
+                    <div class="form-group">
+                        <label>选择Excel文件：</label>
+                        <input type="file" ref="fileInput" accept=".xlsx,.xls" @change="handleFileSelect">
+                    </div>
+                    <button @click="importContacts" :disabled="!selectedFile">导入</button>
+                    <button type="button" @click="showImportModal = false; selectedFile = null">取消</button>
+                    <div v-if="message" :class="messageType">[[ message ]]</div>
+                    <div v-if="importErrors && importErrors.length > 0" style="margin-top: 10px;">
+                        <strong>导入错误：</strong>
+                        <ul style="color: #dc3545; margin-top: 5px;">
+                            <li v-for="error in importErrors" :key="error">[[ error ]]</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 联系人列表 -->
+            <div class="contact-grid">
+                <div v-for="contact in contacts" :key="contact.id" class="card" :class="{bookmarked: contact.is_bookmarked}">
+                    <span class="bookmark-icon" @click="toggleBookmark(contact)" :title="contact.is_bookmarked ? '取消书签' : '添加书签'">
+                        [[ contact.is_bookmarked ? '⭐' : '☆' ]]
+                    </span>
+                    <h4>[[ contact.name ]]</h4>
+                    <div class="contact-info">
+                        <p><strong>电话：</strong> [[ contact.phone ]]</p>
+                        <p v-if="contact.additional_phone"><strong>备用电话：</strong> [[ contact.additional_phone ]]</p>
+                        <p><strong>邮箱：</strong> [[ contact.email ]]</p>
+                        <p><strong>性别：</strong> [[ contact.gender ]]</p>
+                        <p><strong>年龄：</strong> [[ contact.age ]]</p>
+                        <p v-if="contact.social_media"><strong>社交媒体：</strong> [[ contact.social_media ]]</p>
+                        <p v-if="contact.address"><strong>地址：</strong> [[ contact.address ]]</p>
+                        <p v-if="contact.notes"><strong>备注：</strong> [[ contact.notes ]]</p>
+                    </div>
+                    <div style="margin-top: 10px;">
+                        <button @click="editContact(contact)">编辑</button>
+                        <button class="danger" @click="deleteContact(contact.id)">删除</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 添加/编辑联系人表单 -->
+            <div class="card">
+                <h4>[[ editingContact ? '编辑联系人' : '添加新联系人' ]]</h4>
+                <form @submit.prevent="editingContact ? updateContact() : addContact()">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div class="form-group">
+                            <label>姓名：</label>
+                            <input type="text" v-model="contactForm.name" required>
+                        </div>
+                        <div class="form-group">
+                            <label>电话：</label>
+                            <input type="text" v-model="contactForm.phone" required>
+                        </div>
+                        <div class="form-group">
+                            <label>备用电话：</label>
+                            <input type="text" v-model="contactForm.additional_phone">
+                        </div>
+                        <div class="form-group">
+                            <label>邮箱：</label>
+                            <input type="email" v-model="contactForm.email" required>
+                        </div>
+                        <div class="form-group">
+                            <label>性别：</label>
+                            <select v-model="contactForm.gender" required>
+                                <option value="">请选择性别</option>
+                                <option value="男">男</option>
+                                <option value="女">女</option>
+                                <option value="其他">其他</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>年龄：</label>
+                            <input type="number" v-model="contactForm.age" required>
+                        </div>
+                        <div class="form-group">
+                            <label>社交媒体：</label>
+                            <input type="text" v-model="contactForm.social_media" placeholder="如：微信、QQ、微博等">
+                        </div>
+                        <div class="form-group">
+                            <label>地址：</label>
+                            <input type="text" v-model="contactForm.address">
+                        </div>
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label>备注：</label>
+                            <textarea v-model="contactForm.notes" placeholder="其他备注信息"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" v-model="contactForm.is_bookmarked" style="width: auto; margin-right: 5px;">
+                                标记为重要联系人（书签）
+                            </label>
+                        </div>
+                    </div>
+                    <div v-if="editingContact" style="display: flex;">
+                        <button style="width: 50%;" type="submit">[[ editingContact ? '更新' : '添加' ]]联系人</button>
+                        <button style="width: 50%;" type="button" @click="cancelEdit">取消</button>
+                    </div>
+                    <div v-else>
+                        <button style="width: 100%;" type="submit">[[ editingContact ? '更新' : '添加' ]]联系人</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    new Vue({
+        el: '#app',
+        delimiters: ['[[', ']]'],
+        data: {
+            currentUser: null,
+            activeTab: 'login',
+            showProfileModal: false,
+            showImportModal: false,
+            editingContact: null,
+            contacts: [],
+            message: '',
+            messageType: '',
+            searchQuery: '',
+            filterBookmarked: false,
+            selectedFile: null,
+            importErrors: [],
+            loginForm: {
+                username: '',
+                password: ''
+            },
+            registerForm: {
+                username: '',
+                password: '',
+                nickname: '',
+                realname: ''
+            },
+            profileForm: {
+                nickname: '',
+                realname: '',
+                password: ''
+            },
+            contactForm: {
+                name: '',
+                phone: '',
+                additional_phone: '',
+                email: '',
+                gender: '',
+                age: '',
+                social_media: '',
+                address: '',
+                notes: '',
+                is_bookmarked: false
+            }
+        },
+        computed: {
+            API_URL() {
+                return 'http://localhost:5000/api';
+            }
+        },
+        methods: {
+            showMessage(text, type = 'error') {
+                this.message = text;
+                this.messageType = type;
+                setTimeout(() => {
+                    this.message = '';
+                    this.messageType = '';
+                }, 3000);
+            },
+
+            async login() {
+                try {
+                    const response = await axios.post(`${this.API_URL}/login`, this.loginForm);
+                    this.currentUser = response.data.user;
+                    this.showMessage('登录成功！', 'success');
+                    this.loadContacts();
+
+                    // 初始化个人资料表单
+                    this.profileForm.nickname = this.currentUser.nickname;
+                    this.profileForm.realname = this.currentUser.realname;
+                } catch (error) {
+                    this.showMessage(error.response?.data?.message || '登录失败');
+                }
+            },
+
+            async register() {
+                try {
+                    await axios.post(`${this.API_URL}/register`, this.registerForm);
+                    this.showMessage('注册成功！请登录。', 'success');
+                    this.activeTab = 'login';
+                    this.registerForm = { username: '', password: '', nickname: '', realname: '' };
+                } catch (error) {
+                    this.showMessage(error.response?.data?.message || '注册失败');
+                }
+            },
+
+            logout() {
+                this.currentUser = null;
+                this.contacts = [];
+                this.loginForm = { username: '', password: '' };
+            },
+
+            async updateProfile() {
+                try {
+                    await axios.put(`${this.API_URL}/profile/${this.currentUser.id}`, this.profileForm);
+                    this.currentUser.nickname = this.profileForm.nickname;
+                    this.currentUser.realname = this.profileForm.realname;
+                    this.showProfileModal = false;
+                    this.showMessage('个人资料更新成功！', 'success');
+                    this.profileForm.password = '';
+                } catch (error) {
+                    this.showMessage(error.response?.data?.message || '个人资料更新失败');
+                }
+            },
+
+            async loadContacts() {
+                try {
+                    let url = `${this.API_URL}/contacts`;
+                    const params = [];
+                    if (this.filterBookmarked) {
+                        params.push('bookmarked=true');
+                    }
+                    if (this.searchQuery) {
+                        params.push(`search=${encodeURIComponent(this.searchQuery)}`);
+                    }
+                    if (params.length > 0) {
+                        url += '?' + params.join('&');
+                    }
+                    const response = await axios.get(url);
+                    this.contacts = response.data;
+                } catch (error) {
+                    this.showMessage('加载联系人失败');
+                }
+            },
+
+            async addContact() {
+                try {
+                    await axios.post(`${this.API_URL}/contacts`, this.contactForm);
+                    this.showMessage('联系人添加成功！', 'success');
+                    this.resetContactForm();
+                    this.loadContacts();
+                } catch (error) {
+                    this.showMessage('添加联系人失败');
+                }
+            },
+
+            editContact(contact) {
+                this.editingContact = contact;
+                this.contactForm = { ...contact };
+            },
+
+            async updateContact() {
+                try {
+                    await axios.put(`${this.API_URL}/contacts/${this.editingContact.id}`, this.contactForm);
+                    this.showMessage('联系人更新成功！', 'success');
+                    this.cancelEdit();
+                    this.loadContacts();
+                } catch (error) {
+                    this.showMessage('更新联系人失败');
+                }
+            },
+
+            async deleteContact(contactId) {
+                if (confirm('确定要删除这个联系人吗？')) {
+                    try {
+                        await axios.delete(`${this.API_URL}/contacts/${contactId}`);
+                        this.showMessage('联系人删除成功！', 'success');
+                        this.loadContacts();
+                    } catch (error) {
+                        this.showMessage('删除联系人失败');
+                    }
+                }
+            },
+
+            async toggleBookmark(contact) {
+                try {
+                    const response = await axios.put(`${this.API_URL}/contacts/${contact.id}/bookmark`, {
+                        is_bookmarked: !contact.is_bookmarked
+                    });
+                    contact.is_bookmarked = response.data.is_bookmarked;
+                    this.showMessage(contact.is_bookmarked ? '已添加到书签' : '已取消书签', 'success');
+                } catch (error) {
+                    this.showMessage('更新书签状态失败');
+                }
+            },
+
+            toggleBookmarkFilter() {
+                this.filterBookmarked = !this.filterBookmarked;
+                this.loadContacts();
+            },
+
+            async exportContacts() {
+                try {
+                    const response = await axios.get(`${this.API_URL}/contacts/export`, {
+                        responseType: 'blob'
+                    });
+                    const url = window.URL.createObjectURL(new Blob([response.data]));
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.setAttribute('download', '联系人列表.xlsx');
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+                    this.showMessage('导出成功！', 'success');
+                } catch (error) {
+                    this.showMessage('导出失败');
+                }
+            },
+
+            handleFileSelect(event) {
+                this.selectedFile = event.target.files[0];
+            },
+
+            async importContacts() {
+                if (!this.selectedFile) {
+                    this.showMessage('请选择文件', 'error');
+                    return;
+                }
+
+                try {
+                    const formData = new FormData();
+                    formData.append('file', this.selectedFile);
+
+                    const response = await axios.post(`${this.API_URL}/contacts/import`, formData, {
+                        headers: {
+                            'Content-Type': 'multipart/form-data'
+                        }
+                    });
+
+                    this.showMessage(response.data.message, 'success');
+                    this.importErrors = response.data.errors || [];
+                    this.selectedFile = null;
+                    this.showImportModal = false;
+                    this.loadContacts();
+                } catch (error) {
+                    this.showMessage(error.response?.data?.message || '导入失败');
+                    if (error.response?.data?.errors) {
+                        this.importErrors = error.response.data.errors;
+                    }
+                }
+            },
+
+            cancelEdit() {
+                this.editingContact = null;
+                this.resetContactForm();
+            },
+
+            resetContactForm() {
+                this.contactForm = {
+                    name: '',
+                    phone: '',
+                    additional_phone: '',
+                    email: '',
+                    gender: '',
+                    age: '',
+                    social_media: '',
+                    address: '',
+                    notes: '',
+                    is_bookmarked: false
+                };
+            }
+        },
+        mounted() {
+            // 检查用户是否已登录（从localStorage）
+            const savedUser = localStorage.getItem('currentUser');
+            if (savedUser) {
+                this.currentUser = JSON.parse(savedUser);
+                this.loadContacts();
+
+                // 初始化个人资料表单
+                this.profileForm.nickname = this.currentUser.nickname;
+                this.profileForm.realname = this.currentUser.realname;
+            }
+        },
+        watch: {
+            currentUser: {
+                handler(newUser) {
+                    if (newUser) {
+                        localStorage.setItem('currentUser', JSON.stringify(newUser));
+                    } else {
+                        localStorage.removeItem('currentUser');
+                    }
+                },
+                deep: true
+            }
+        }
+    });
+</script>
+</body>
+</html>
+
